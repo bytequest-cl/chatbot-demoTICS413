@@ -55,4 +55,9 @@ app.get('/ws', upgradeWebSocket(() => {
     },
   }
 }))
-export default { hostname: '127.0.0.1', port: 3047, fetch: app.fetch, websocket }
+export default {
+  hostname: '0.0.0.0',
+  port: Number(process.env.PORT ?? 3047),
+  fetch: app.fetch,
+  websocket,
+}
