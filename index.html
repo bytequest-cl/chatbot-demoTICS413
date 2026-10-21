@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chat · Hono + Bun</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#eef1f5;color:#172033;font:16px system-ui;min-height:100dvh;display:grid;place-items:center;padding:20px}main{width:min(100%,720px);height:min(800px,90dvh);background:white;border:1px solid #dce1e9;border-radius:24px;display:flex;flex-direction:column;box-shadow:0 20px 80px #17203312;overflow:hidden}header{padding:24px 28px;border-bottom:1px solid #eee}h1{font-size:23px;margin:0 0 6px}small{color:#64748b}#status{float:right;font-size:13px;color:#64748b}#messages{flex:1;overflow:auto;padding:24px;display:flex;flex-direction:column;gap:14px}.message{max-width:85%;padding:13px 17px;border-radius:17px;background:#f1f4f8;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}.user{align-self:flex-end;background:#315cf5;color:white}.label{display:block;font-size:11px;opacity:.65;margin-bottom:5px;font-weight:700}form{display:flex;gap:10px;padding:20px;border-top:1px solid #eee}input{min-width:0;flex:1;border:1px solid #dce1e9;border-radius:12px;padding:14px;font:inherit}button{background:#315cf5;color:white;border:0;border-radius:12px;padding:0 20px;font:inherit;cursor:pointer}button:disabled{opacity:.45}footer{text-align:center;padding:0 14px 16px;font-size:12px;color:#64748b}
+.system{align-self:center;background:transparent;color:#64748b;font-size:13px;text-align:center;padding:4px}.system .label{display:none}</style>
+<main><header><span id="status" role="status">Conectando…</span><h1>Sala compartida</h1><small><span id="identity">Asignando usuario…</span> · <span id="online">0 conectados</span></small></header><div id="messages" role="log" aria-live="polite"></div><form><input aria-label="Mensaje" placeholder="Escribe un mensaje…" maxlength="4000" autocomplete="off" required><button disabled>Enviar →</button></form><footer>Abre otra pestaña para simular otro usuario. Historial de los últimos 200 mensajes mientras el servidor esté activo.</footer></main>
+<script>
+const messages = document.querySelector('#messages'), input = document.querySelector('input'), button = document.querySelector('button'), status = document.querySelector('#status');
+let me;
+function add(content, name = 'Sistema', own = false, system = false) {
+  const bubble = document.createElement('div');
+  bubble.className = 'message' + (own ? ' user' : '') + (system ? ' system' : '');
+  const label = document.createElement('span'); label.className = 'label'; label.textContent = own ? name + ' (tú)' : name;
+  bubble.append(label, document.createTextNode(content)); messages.append(bubble); messages.scrollTop = messages.scrollHeight;
+}
+const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+ws.onopen = () => { status.textContent = '● Conectado'; status.style.color = '#16845a'; input.focus(); };
+ws.onmessage = event => {
+  try {
+    const data = JSON.parse(event.data);
+    if (data.type === 'welcome') { me = data.user; document.querySelector('#identity').textContent = 'Eres ' + me.name; button.disabled = false; }
+    else if (data.type === 'history') {
+      messages.replaceChildren();
+      for (const message of data.messages) add(message.content, message.user.name, message.user.id === me?.id);
+    }
+    else if (data.type === 'presence') document.querySelector('#online').textContent = data.count + ' conectados';
+    else if (data.type === 'message') add(data.content, data.user.name, data.user.id === me?.id);
+    else add(data.content, 'Sistema', false, true);
+  } catch { add('No se pudo leer el mensaje.', 'Sistema', false, true); }
+};
+ws.onclose = () => { status.textContent = 'Desconectado · recarga para conectar'; button.disabled = true; document.querySelector('#online').textContent = 'Sin conexión'; };
+ws.onerror = () => { status.textContent = 'Error de conexión'; button.disabled = true; };
+document.querySelector('form').onsubmit = event => {
+  event.preventDefault(); const content = input.value.trim();
+  if (!content || !me || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ content })); input.value = ''; input.focus();
+};
+</script>
+</html>

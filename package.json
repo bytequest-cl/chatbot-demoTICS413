@@ -1,0 +1,1 @@
+{"name":"chatbot-demo","private":true,"type":"module","scripts":{"dev":"bun run --watch index.ts"},"dependencies":{"hono":"latest","@hono/bun":"latest"},"devDependencies":{"bun":"latest"}}
