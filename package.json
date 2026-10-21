@@ -1,1 +1,18 @@
-{"name":"chatbot-demo","private":true,"type":"module","scripts":{"dev":"bun run --watch index.ts"},"dependencies":{"hono":"latest","@hono/bun":"latest"},"devDependencies":{"bun":"latest"}}
+{
+  "name": "chatbot-demo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@hono/node-server": "latest",
+    "hono": "latest",
+    "ws": "latest"
+  }
+}

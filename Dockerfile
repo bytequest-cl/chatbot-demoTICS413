@@ -1,13 +1,16 @@
-FROM oven/bun:1
+FROM node:22-alpine
+
+ENV NODE_ENV=production
+ENV PORT=8080
 
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN bun install --production --no-save
+RUN npm ci --omit=dev && npm cache clean --force
 
-COPY index.ts index.html ./
+COPY server.js index.html ./
 
-ENV PORT=8080
 EXPOSE 8080
+USER node
 
-CMD ["bun", "run", "index.ts"]
+CMD ["npm", "start"]

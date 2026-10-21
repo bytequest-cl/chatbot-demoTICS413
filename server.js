@@ -1,29 +1,31 @@
+import { readFile } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
 import { Hono } from 'hono'
-import { upgradeWebSocket, websocket } from '@hono/bun'
-import type { WSContext } from 'hono/ws'
+import { serve, upgradeWebSocket } from '@hono/node-server'
+import { WebSocketServer } from 'ws'
 
 const app = new Hono()
-const clients = new Map<string, WSContext>()
-type ChatMessage = {
-  type: 'message'
-  user: { id: string; name: string }
-  content: string
-}
-const history: ChatMessage[] = []
+const clients = new Map()
+const history = []
 const HISTORY_LIMIT = 200
 let nextUser = 1
 
-function broadcast(data: unknown) {
+function broadcast(data) {
   const payload = JSON.stringify(data)
   for (const ws of clients.values()) {
     if (ws.readyState === 1) ws.send(payload)
   }
 }
+
 function presence() {
   broadcast({ type: 'presence', count: clients.size })
 }
 
-app.get('/', () => new Response(Bun.file(import.meta.dir + '/index.html')))
+app.get('/', async (c) => {
+  const html = await readFile(fileURLToPath(new URL('./index.html', import.meta.url)), 'utf8')
+  return c.html(html)
+})
+
 app.get('/ws', upgradeWebSocket(() => {
   const user = { id: crypto.randomUUID(), name: `Usuario ${nextUser++}` }
   return {
@@ -38,8 +40,10 @@ app.get('/ws', upgradeWebSocket(() => {
       try {
         if (typeof event.data !== 'string') throw new Error('Envía texto.')
         const data = JSON.parse(event.data)
-        if (typeof data?.content !== 'string' || !data.content.trim() || data.content.length > 4000) throw new Error('Escribe entre 1 y 4000 caracteres.')
-        const message: ChatMessage = { type: 'message', user, content: data.content.trim() }
+        if (typeof data?.content !== 'string' || !data.content.trim() || data.content.length > 4000) {
+          throw new Error('Escribe entre 1 y 4000 caracteres.')
+        }
+        const message = { type: 'message', user, content: data.content.trim() }
         history.push(message)
         if (history.length > HISTORY_LIMIT) history.shift()
         broadcast(message)
@@ -47,7 +51,7 @@ app.get('/ws', upgradeWebSocket(() => {
         ws.send(JSON.stringify({ type: 'error', content: error instanceof Error ? error.message : 'Mensaje inválido.' }))
       }
     },
-    onClose(_event, ws) {
+    onClose() {
       if (clients.delete(user.id)) {
         broadcast({ type: 'system', content: `${user.name} salió del chat.` })
         presence()
@@ -55,9 +59,8 @@ app.get('/ws', upgradeWebSocket(() => {
     },
   }
 }))
-export default {
-  hostname: '0.0.0.0',
-  port: Number(process.env.PORT ?? 3047),
-  fetch: app.fetch,
-  websocket,
-}
+
+const websocketServer = new WebSocketServer({ noServer: true })
+const port = Number(process.env.PORT ?? 3047)
+serve({ fetch: app.fetch, port, hostname: '0.0.0.0', websocket: { server: websocketServer } })
+console.log(`Chat listo en el puerto ${port}`)
